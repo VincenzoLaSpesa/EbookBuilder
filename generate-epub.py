@@ -1,4 +1,4 @@
-from pathlib import Path
+import pathlib
 import os
 from subprocess import check_output
 from MarkdownPP import MarkdownPP
@@ -10,6 +10,8 @@ import shutil
 import re 
 from PIL import Image
 
+PLANTUML_PATH="D:\\ProgrammiPortable\\bin\\plantuml.jar"
+
 def run(cmd, echo=True, shell=True, printOutput = True):
     if echo:
         print(cmd)
@@ -17,6 +19,14 @@ def run(cmd, echo=True, shell=True, printOutput = True):
     if printOutput:
       print(output)
     return output
+
+def generateUmls(inputFolder: str, filter: str, outputFolder: str): 
+    flist=pathlib.Path(inputFolder).glob(filter)
+    for fname in flist:
+      basename = (os.path.basename(fname).split("."))[0]
+      basename_with_path=str(fname).split('.')[0]
+      run(f"java -jar {PLANTUML_PATH} {fname} -tpng")
+      shutil.move(basename_with_path+".png", os.path.join(outputFolder, basename+".png"))    
 
 
 def clean_fucked_utf8_file(file: str):
@@ -28,46 +38,74 @@ def clean_fucked_utf8_file(file: str):
   os.remove("temp.tmp")
 
 
-def substituteinfiles(target, substitution, inputfile, outputfile):
-  fin = open(inputfile, "rt")
-  fout = open(outputfile, "wt")
-  for line in fin:
-    fout.write(line.replace(target, substitution))
-  fin.close()
-  fout.close()
+'''
+Applies a chain of filters to the input file, save it to the output file
+'''
+def clean_latex_source(inputFile: str, outputFile: str):
 
-def clean_latex_source(fname: str):
-  pattern=[r'\includegraphics{./img/',r'\includegraphics[width=0.9\textwidth]{../img/']
-  fin = open(fname, "rt")
-  fout = open('./build/'+fname, "wt")
-  for line in fin:
-    if pattern[0] in line:
-      line= line.replace(pattern[0], pattern[1])
-      # converting gif
-      if '.gif}' in line:
-        regex = r"{([^}]+)}"
-        matches = [ x[1] for x in re.finditer(regex, line)]
-        for m in matches:
-          if '.gif' in m:
-            print("Converting",m)        
-            outname = os.path.basename(m) + ".jpg"
-            im = Image.open(m[1:]).convert('RGB')
-            im.save("./build/"+outname)
-            line= line.replace(m, outname)
+  def custom_unicodes(line: str) -> list:
+      unicodes=[['∙', ' $ \cdot $  ']]
+      changed= False
+      for pattern in unicodes:
+        if pattern[0] in line:
+          line= line.replace(pattern[0], pattern[1])
+          changed = True
+      return line, changed
 
-    fout.write(line)
-  fin.close()
-  fout.close()
+
+  def resize_images(line: str) -> list:
+    patterns=[#fix huge images
+      [r'\includegraphics{',r'\includegraphics[width=0.9\textwidth]{'],
+      [r'\includegraphics{',r'\includegraphics[width=0.9\textwidth]{'],
+    ]
+    changed= False
+    for pattern in patterns:
+      if pattern[0] in line:
+        line= line.replace(pattern[0], pattern[1])
+        changed=True
+    return line, changed
+
+  def convert_gif(line:str) -> list:
+    if '.gif}' in line:
+              regex = r"{([^}]+)}"
+              matches = [ x[1] for x in re.finditer(regex, line)]
+              for m in matches:
+                if '.gif' in m:
+                  fullname = os.path.abspath(m)
+                  print("Converting",fullname)        
+                  outname = os.path.basename(fullname) + ".jpg"
+                  im = Image.open(fullname).convert('RGB')
+                  output_path = pathlib.Path(os.path.abspath("./out/"+outname)).as_posix()
+                  im.save(output_path)
+                  line= line.replace(m, output_path) 
+              return line, True
+    return line, False  
+
+
+  filter_chain= [resize_images, convert_gif, custom_unicodes]
+  
+  with open(inputFile, "rt",encoding="utf8") as fin:
+    with open(outputFile, "wt",encoding="utf8") as fout:
+      for line in fin:
+        line=line.encode('ascii',errors='ignore').decode()
+        for f in filter_chain:
+          line, changed = f(line)
+          if changed:
+            print("->", line)
+        fout.write(line)
 
 
 def generate_documents(infile: str, outfile: str, language: str, template: str):
   clean_fucked_utf8_file(infile)
   print("Generating", language)
-  run(f"pandoc --metadata-file=metadata.yaml --metadata=lang:{language} -f markdown -s -t latex --template {template} -i {infile} -o {infile}.tex")
-  run(f"pandoc --metadata-file=metadata.yaml --metadata=lang:{language} --from=markdown -i {infile} -o {outfile}")
-  run(f"pandoc --metadata-file=metadata.yaml --metadata=lang:{language} --from=markdown -i {infile} -o {outfile}.odt")
-  clean_latex_source(infile+'.tex')
+  base=f"pandoc --metadata-file=metadata.yaml --metadata=lang:{language} --from=markdown"
+  run(f"{base} -s -t latex --template {template} -i {infile} -o {infile}_original.tex")
+  run(f"{base} -i {infile} -o {outfile}.epub")
+  run(f"{base} -i {infile} -o {outfile}.odt")
+  clean_latex_source(infile+'_original.tex', "./out/"+infile+'.tex')
   print(f"Done! You can find the '{language}' book at ./{outfile}")
+  return [f"{outfile}.epub", f"{outfile}.odt", "./out/"+infile+'.tex',infile+'_original.tex' ]
+
 
 def escape(text: str) -> str:
   text = text.replace(' ', '_').replace(',', '_')
@@ -93,15 +131,25 @@ def generate(title: str, language: str, template: str, fileList: list):
   MarkdownPP(input=infile, modules=['include', 'toc'], output=outfile)
   infile.close()
   outfile.close()
-  generate_documents(name+".md",name+".epub", language, template)
-
+  artifacts = generate_documents(name+".md",name, language, template)
+  
+  for a in artifacts:
+    if not a.startswith('./out/'):
+      shutil.move(a, "./out/"+a)
+  
 # main
 os.chdir("./data")
+import os
+
+if not os.path.exists('out'):
+   os.makedirs('out')
+
 metadata={}
 with open('metadata.yaml') as file:
     metadata = yaml.safe_load(file)
 
-flist=Path('.').glob('*.md')
+flist=pathlib.Path('.').glob('*.md')
+generateUmls("./data", "*.puml", "./img")
 
 generate(metadata['title'], metadata['language'], metadata['template'],flist)
 

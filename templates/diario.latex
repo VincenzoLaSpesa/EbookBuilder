@@ -1,0 +1,106 @@
+% Inizio Preambolo
+\documentclass[a4paper,11pt,oneside,openright]{article}
+%\usepackage[latin1]{inputenc} % lettere accentate da tastiera
+
+%\usepackage[cm]{fullpage}
+\usepackage[top=1in, bottom=1.25in, left=1.1in, right=1.1in]{geometry}
+
+\usepackage[utf8]{inputenc}
+\usepackage[italian]{babel} % per scrivere in italiano
+
+\usepackage{eurosym}
+%\newcommand{\euro}{€}
+
+\usepackage[T1]{fontenc} % imposta la codifica dei font
+\usepackage{charter}
+\usepackage{latexsym}
+\usepackage{psfrag}
+\usepackage{epsfig}
+\usepackage{graphicx}% comando per inserire le figure di matlab
+\usepackage[intlimits]{amsmath}
+\usepackage{amsmath}
+\usepackage{exscale}
+\usepackage{url} % per gli indirizzi Internet
+\usepackage{textcomp}
+\usepackage{makeidx}
+
+%\usepackage[bookmarks,colorlinks,hidelinks]{hyperref}% comando per i collegamenti dall'indice e nel testo
+\usepackage[bookmarks,colorlinks,hidelinks,linkbordercolor={1 1 1}]{hyperref} 
+\usepackage{listings}
+\usepackage[usenames]{color}
+
+
+\usepackage[nochapters]{classicthesis}
+\usepackage{amscd}
+\usepackage{indentfirst}
+\usepackage{amssymb,amsthm}
+ \linespread{1.3}% interlinea
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\renewcommand{\chaptermark}[1]{\markboth{#1}{}}
+\renewcommand{\sectionmark}[1]{\markright{\thesection\ #1}}
+\fancyhf{}
+\fancyhead[LE,RO]{\bfseries\thepage}
+\fancyhead[RE]{\bfseries\footnotesize\nouppercase{\leftmark}}
+\fancyhead[LO]{\bfseries\footnotesize\nouppercase{\rightmark}}
+
+\usepackage[font=small,format=hang,labelfont={sf,bf}]{caption}
+
+\makeindex
+
+\begin{document}
+$if(title)$
+\maketitle
+$endif$
+
+$for(include-before)$
+$include-before$
+
+$endfor$
+$if(toc)$
+{
+$if(colorlinks)$
+\hypersetup{linkcolor=$if(toccolor)$$toccolor$$else$black$endif$}
+$endif$
+\setcounter{tocdepth}{$toc-depth$}
+\tableofcontents
+}
+$endif$
+$if(lot)$
+\listoftables
+$endif$
+$if(lof)$
+\listoffigures
+$endif$
+$body$
+
+$if(natbib)$
+$if(bibliography)$
+$if(biblio-title)$
+$if(book-class)$
+\renewcommand\bibname{$biblio-title$}
+$else$
+\renewcommand\refname{$biblio-title$}
+$endif$
+$endif$
+\bibliography{$for(bibliography)$$bibliography$$sep$,$endfor$}
+
+$endif$
+$endif$
+$if(biblatex)$
+\printbibliography$if(biblio-title)$[title=$biblio-title$]$endif$
+
+$endif$
+$for(include-after)$
+$include-after$
+
+$endfor$
+
+\newpage
+\begingroup
+\renewcommand{\vspace}[2]{}% Gobble 2 arguments after \vspace
+\tableofcontents
+\endgroup
+
+
+\end{document}
