@@ -37,11 +37,19 @@ def clean_fucked_utf8_file(file: str):
         outfile.write(fix_encoding(line))
   os.remove("temp.tmp")
 
+def is_number(s):
+    try:
+        complex(s) # for int, long, float and complex
+    except ValueError:
+        return False
+
+    return True
+
 
 '''
 Applies a chain of filters to the input file, save it to the output file
 '''
-def clean_latex_source(inputFile: str, outputFile: str):
+def apply_filters_chain(inputFile: str, outputFile: str):
 
   def custom_unicodes(line: str) -> list:
       unicodes=[['∙', ' $ \cdot $  ']]
@@ -52,6 +60,20 @@ def clean_latex_source(inputFile: str, outputFile: str):
           changed = True
       return line, changed
 
+  def make_links_absolute(line: str) -> list:
+    patterns=[
+      r".+{([^}]+\..+)}"
+    ]    
+    changed= False
+    for pattern in patterns:
+      matches = [ x[1] for x in re.finditer(pattern, line)]
+      for m in matches:
+        if (not is_number(m)) and os.path.isfile(m):
+          print("this seems a link",m,line.strip())
+          output_path = pathlib.Path(os.path.abspath(m)).as_posix()
+          line= line.replace(m, output_path)
+          changed=True
+    return line, changed
 
   def resize_images(line: str) -> list:
     patterns=[#fix huge images
@@ -82,7 +104,7 @@ def clean_latex_source(inputFile: str, outputFile: str):
     return line, False  
 
 
-  filter_chain= [resize_images, convert_gif, custom_unicodes]
+  filter_chain= [resize_images, convert_gif, custom_unicodes, make_links_absolute]
   
   with open(inputFile, "rt",encoding="utf8") as fin:
     with open(outputFile, "wt",encoding="utf8") as fout:
@@ -102,7 +124,7 @@ def generate_documents(infile: str, outfile: str, language: str, template: str):
   run(f"{base} -s -t latex --template {template} -i {infile} -o {infile}_original.tex")
   run(f"{base} -i {infile} -o {outfile}.epub")
   run(f"{base} -i {infile} -o {outfile}.odt")
-  clean_latex_source(infile+'_original.tex', "./out/"+infile+'.tex')
+  apply_filters_chain(infile+'_original.tex', "./out/"+infile+'.tex')
   print(f"Done! You can find the '{language}' book at ./{outfile}")
   return [f"{outfile}.epub", f"{outfile}.odt", "./out/"+infile+'.tex',infile+'_original.tex' ]
 
@@ -120,6 +142,7 @@ def generate(title: str, language: str, template: str, fileList: list):
 
 
     ppfile.write(f"# {title}\r\n")
+    ppfile.write("\r\n!TOC\r\n")
         
     for fname in fileList:
       print(fname)
@@ -128,7 +151,7 @@ def generate(title: str, language: str, template: str, fileList: list):
   
   infile = open(name+".mdPP", "r",encoding="utf8")
   outfile = open(name+".md", "w", encoding="utf8")
-  MarkdownPP(input=infile, modules=['include', 'toc'], output=outfile)
+  MarkdownPP(input=infile, modules=['include', 'tableofcontents', 'ImageRelativeToRoot'], output=outfile, encoding="UTF8")
   infile.close()
   outfile.close()
   artifacts = generate_documents(name+".md",name, language, template)
@@ -136,8 +159,26 @@ def generate(title: str, language: str, template: str, fileList: list):
   for a in artifacts:
     if not a.startswith('./out/'):
       shutil.move(a, "./out/"+a)
+
+def check_tools():
+  cmds=["pandoc -v"]
   
+  for c in cmds:
+    try:
+      s=run(c,False,True,False)
+      print(s.split('\n', 1)[0])
+    except:
+      print("I could not run", c.split()[0], "the script will exit")
+      return False
+  return True
+      
+
+
 # main
+
+if not check_tools():
+  exit(False)
+
 os.chdir("./data")
 import os
 
@@ -148,7 +189,8 @@ metadata={}
 with open('metadata.yaml') as file:
     metadata = yaml.safe_load(file)
 
-flist=pathlib.Path('.').glob('*.md')
+glob=[ str(x) for x in list(pathlib.Path('.').rglob('*.md'))]
+flist=[ x for x in glob if not x.startswith('./out/')]
 generateUmls("./data", "*.puml", "./img")
 
 generate(metadata['title'], metadata['language'], metadata['template'],flist)
