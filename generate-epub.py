@@ -9,6 +9,8 @@ from ftfy import fix_encoding
 import shutil
 import re 
 from PIL import Image
+import argparse
+import pprint
 
 PLANTUML_PATH="D:\\ProgrammiPortable\\bin\\plantuml.jar"
 
@@ -51,6 +53,8 @@ Applies a chain of filters to the input file, save it to the output file
 '''
 def apply_filters_chain(inputFile: str, outputFile: str):
 
+  output_folder=os.path.dirname(outputFile)
+
   def custom_unicodes(line: str) -> list:
       unicodes=[['∙', ' $ \cdot $  ']]
       changed= False
@@ -69,7 +73,7 @@ def apply_filters_chain(inputFile: str, outputFile: str):
       matches = [ x[1] for x in re.finditer(pattern, line)]
       for m in matches:
         if (not is_number(m)) and os.path.isfile(m):
-          print("this seems a link",m,line.strip())
+          print("L\t",m,line.strip())
           output_path = pathlib.Path(os.path.abspath(m)).as_posix()
           line= line.replace(m, output_path)
           changed=True
@@ -88,20 +92,23 @@ def apply_filters_chain(inputFile: str, outputFile: str):
     return line, changed
 
   def convert_gif(line:str) -> list:
+    changed= False
     if '.gif}' in line:
               regex = r"{([^}]+)}"
               matches = [ x[1] for x in re.finditer(regex, line)]
               for m in matches:
                 if '.gif' in m:
                   fullname = os.path.abspath(m)
-                  print("Converting",fullname)        
-                  outname = os.path.basename(fullname) + ".jpg"
-                  im = Image.open(fullname).convert('RGB')
-                  output_path = pathlib.Path(os.path.abspath("./out/"+outname)).as_posix()
-                  im.save(output_path)
-                  line= line.replace(m, output_path) 
-              return line, True
-    return line, False  
+                  if os.path.isfile(fullname):
+                    #print("Converting",fullname)        
+                    outname = os.path.basename(fullname) + ".jpg"
+                    im = Image.open(fullname).convert('RGB')                  
+                    output_path = pathlib.Path(os.path.abspath(os.path.join(output_folder, outname))).as_posix()
+                    im.save(output_path)
+                    print("C\t",fullname,"\t->\t",output_path)
+                    line= line.replace(m, output_path)
+                    changed=True 
+    return line, changed  
 
 
   filter_chain= [resize_images, convert_gif, custom_unicodes, make_links_absolute]
@@ -117,23 +124,36 @@ def apply_filters_chain(inputFile: str, outputFile: str):
         fout.write(line)
 
 
-def generate_documents(infile: str, outfile: str, language: str, template: str):
+def generate_documents(infile: str, outfile: str, language: str, template: str, outputfolder: str):
   clean_fucked_utf8_file(infile)
   print("Generating", language)
   base=f"pandoc --metadata-file=metadata.yaml --metadata=lang:{language} --from=markdown"
   run(f"{base} -s -t latex --template {template} -i {infile} -o {infile}_original.tex")
   run(f"{base} -i {infile} -o {outfile}.epub")
   run(f"{base} -i {infile} -o {outfile}.odt")
-  apply_filters_chain(infile+'_original.tex', "./out/"+infile+'.tex')
-  print(f"Done! You can find the '{language}' book at ./{outfile}")
-  return [f"{outfile}.epub", f"{outfile}.odt", "./out/"+infile+'.tex',infile+'_original.tex' ]
+  filteredTex = os.path.join(outputfolder, infile+'.tex')
+  apply_filters_chain(infile+'_original.tex', filteredTex)
+  print("B\t",filteredTex)
+  artifacts = [f"{outfile}.epub", f"{outfile}.odt", filteredTex ,infile+'_original.tex' ]
+  for a in artifacts:
+    if not is_file_in_directory(a, outputFolder):
+      d=os.path.join(outputfolder,a)
+      print("M\t",a,"\t->\t",d)
+      shutil.move(a, d)
+
 
 
 def escape(text: str) -> str:
   text = text.replace(' ', '_').replace(',', '_')
   return urllib.parse.quote(text, safe='')
 
-def generate(title: str, language: str, template: str, fileList: list):
+
+def is_file_in_directory(file_path: str, directory: str) -> bool:
+    file_path = os.path.abspath(file_path)
+    directory = os.path.abspath(directory)
+    return file_path.startswith(directory)
+
+def generate(title: str, language: str, template: str, fileList: list, outputfolder: str):
   name = escape(title)
   with open(name+".mdPP", "w",encoding="utf8") as ppfile:
     if os.path.isfile("README.md"):
@@ -145,7 +165,7 @@ def generate(title: str, language: str, template: str, fileList: list):
     ppfile.write("\r\n!TOC\r\n")
         
     for fname in fileList:
-      print(fname)
+      print("A\t",fname)
       ppfile.write(f"\r\n!INCLUDE \"{fname}\", 2\r\n --- \r\n")
     ppfile.write(f"Build {time.ctime()}\r\n")
   
@@ -154,22 +174,28 @@ def generate(title: str, language: str, template: str, fileList: list):
   MarkdownPP(input=infile, modules=['include', 'tableofcontents', 'ImageRelativeToRoot'], output=outfile, encoding="UTF8")
   infile.close()
   outfile.close()
-  artifacts = generate_documents(name+".md",name, language, template)
-  
-  for a in artifacts:
-    if not a.startswith('./out/'):
-      shutil.move(a, "./out/"+a)
+  generate_documents(name+".md",name, language, template, outputFolder)
+
+  print(f"Done! You can find the '{language}' book in {outputFolder}")
 
 def check_tools():
-  cmds=["pandoc -v"]
+  # first column is the command, second column is set to true if it's needed
+  cmds=[
+    ("pandoc -v", True),
+    ("java -version", False),
+    (f"java -jar \"{PLANTUML_PATH}\" -version", False)    
+    ]
   
   for c in cmds:
     try:
-      s=run(c,False,True,False)
+      s=run(c[0],False,True,False)
       print(s.split('\n', 1)[0])
     except:
-      print("I could not run", c.split()[0], "the script will exit")
-      return False
+      print("I could not run", c[0].split()[0])
+      if c[1]:
+        print("the script will exit")
+        return False
+  print("All the mandatory tools seems available, let's start")
   return True
       
 
@@ -179,11 +205,32 @@ def check_tools():
 if not check_tools():
   exit(False)
 
-os.chdir("./data")
-import os
+parser = argparse.ArgumentParser()
+parser.add_argument("-i", "--inputFolder",type=str, help="input folder", required=False)
+parser.add_argument("-o", "--outputFolder",type=str, help="output folder", required=False)
 
-if not os.path.exists('out'):
-   os.makedirs('out')
+args = parser.parse_args()
+pprint.pprint(args)
+
+inputFolder=os.path.abspath("./data")
+outputFolder=os.path.abspath("./data/out")
+
+inputFolder = "D:\\Codice\\Frammenti"
+outputFolder="D:\\Codice\\EbookBuilder\\customoutput"
+
+
+if args.inputFolder:
+  inputFolder=os.path.abspath(args.inputFolder)
+
+if args.outputFolder:
+  inputFolder=os.path.abspath(args.inputFolder)
+
+print(inputFolder,"\t->\t", outputFolder)
+
+os.chdir(inputFolder)
+
+if not os.path.exists(outputFolder):
+   os.makedirs(outputFolder)
 
 metadata={}
 with open('metadata.yaml') as file:
@@ -191,7 +238,8 @@ with open('metadata.yaml') as file:
 
 glob=[ str(x) for x in list(pathlib.Path('.').rglob('*.md'))]
 flist=[ x for x in glob if not x.startswith('./out/')]
-generateUmls("./data", "*.puml", "./img")
+imgFolder = os.path.join(inputFolder, 'img')
+generateUmls(inputFolder, "*.puml", imgFolder)
 
-generate(metadata['title'], metadata['language'], metadata['template'],flist)
+generate(metadata['title'], metadata['language'], metadata['template'],flist, outputFolder)
 
