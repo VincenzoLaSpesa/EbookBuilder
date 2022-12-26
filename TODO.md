@@ -11,6 +11,7 @@ Project Description
 - [ ] Make a pip package out of it? ( What about markdownPP that is not updated and not mine? )
 - [ ] Make a pip package out of it? ( What about markdownPP that is not updated and not mine? )
 - [ ] Add a playlist/blacklist feature
+- [ ] MarkdownPP as a git submodule **VERY IMPORTANT**
 ### In Progress
 - [ ] Commandline parameters for specifying some options ( generate toc? generate latex?)
 

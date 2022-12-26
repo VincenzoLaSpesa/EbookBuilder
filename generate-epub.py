@@ -1,7 +1,6 @@
 import pathlib
 import os
 from subprocess import check_output
-from MarkdownPP import MarkdownPP
 import time
 import yaml
 import urllib
@@ -11,6 +10,11 @@ import re
 from PIL import Image
 import argparse
 import pprint
+import sys
+
+sys.path.append("./markdown-pp")
+from MarkdownPP import MarkdownPP
+
 
 PLANTUML_PATH="D:\\ProgrammiPortable\\bin\\plantuml.jar"
 
