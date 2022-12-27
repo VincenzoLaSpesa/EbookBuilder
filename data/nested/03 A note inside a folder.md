@@ -1,4 +1,4 @@
-# A note inside a folder
+# 03 A note inside a folder
 
 Handling notes across folders is complicated as the links could either be relative to the current note or to the root folder.
 Markdown is not supposed to handle absolute paths.

@@ -77,7 +77,7 @@ def apply_filters_chain(inputFile: str, outputFile: str):
       matches = [ x[1] for x in re.finditer(pattern, line)]
       for m in matches:
         if (not is_number(m)) and os.path.isfile(m):
-          print("LTX\tFixPath\t",m,line.strip())
+          print("LTX\tFixPath\t",line.strip())
           output_path = pathlib.Path(os.path.abspath(m)).as_posix()
           line= line.replace(m, output_path)
           changed=True
@@ -93,7 +93,7 @@ def apply_filters_chain(inputFile: str, outputFile: str):
       if pattern[0] in line:
         line= line.replace(pattern[0], pattern[1])
         changed=True
-        print("LTX\tFormat\t",line)
+        print("LTX\tFormat\t",line.strip())
     return line, changed
 
   def convert_gif(line:str) -> list:
@@ -123,9 +123,7 @@ def apply_filters_chain(inputFile: str, outputFile: str):
       for line in fin:
         line=line.encode('ascii',errors='ignore').decode()
         for f in filter_chain:
-          line, changed = f(line)
-          if changed:
-            print("->", line)
+          line, _ = f(line)
         fout.write(line)
 
 
@@ -220,6 +218,7 @@ pprint.pprint(args)
 
 inputFolder=os.path.abspath("./data")
 outputFolder=os.path.abspath("./data/out")
+blackList=set()
 
 #inputFolder = "D:\\Codice\\Frammenti"
 outputFolder="D:\\Codice\\EbookBuilder\\customoutput"
@@ -242,8 +241,11 @@ metadata={}
 with open('metadata.yaml') as file:
     metadata = yaml.safe_load(file)
 
+blackList.add(metadata['title']+'.md')
+blackList.add(escape(metadata['title'])+'.md')
+
 glob=[ str(x) for x in list(pathlib.Path('.').rglob('*.md'))]
-flist=[ x for x in glob if not x.startswith('./out/')]
+flist=[ x for x in glob if not (x.startswith('./out/') or x in blackList)]
 imgFolder = os.path.join(inputFolder, 'img')
 generateUmls(inputFolder, "*.puml", imgFolder)
 
