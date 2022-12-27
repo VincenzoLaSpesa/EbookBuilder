@@ -11,7 +11,9 @@ Project Description
 - [ ] Make a pip package out of it? ( What about markdownPP that is not updated and not mine? )
 - [ ] Make a pip package out of it? ( What about markdownPP that is not updated and not mine? )
 - [ ] Add a playlist/blacklist feature
-- [ ] MarkdownPP as a git submodule **VERY IMPORTANT**
+- [ ] The toc feature breaks the inference of the image paths ( fix inside markdownPP)
+- [ ] some urls breaks the inference of the image paths ( just do not touch them from MarkdownPP)
+
 ### In Progress
 - [ ] Commandline parameters for specifying some options ( generate toc? generate latex?)
 
@@ -22,4 +24,4 @@ Project Description
 - [ ] Make all the image paths absolute for the latex output  
 - [ ] Make all the image relative to the base folder
 - [ ] Commandline parameters for specifying the input and output folder  
-
+- [ ] MarkdownPP as a git submodule

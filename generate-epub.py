@@ -77,7 +77,7 @@ def apply_filters_chain(inputFile: str, outputFile: str):
       matches = [ x[1] for x in re.finditer(pattern, line)]
       for m in matches:
         if (not is_number(m)) and os.path.isfile(m):
-          print("L\t",m,line.strip())
+          print("LTX\tFixPath\t",m,line.strip())
           output_path = pathlib.Path(os.path.abspath(m)).as_posix()
           line= line.replace(m, output_path)
           changed=True
@@ -93,6 +93,7 @@ def apply_filters_chain(inputFile: str, outputFile: str):
       if pattern[0] in line:
         line= line.replace(pattern[0], pattern[1])
         changed=True
+        print("LTX\tFormat\t",line)
     return line, changed
 
   def convert_gif(line:str) -> list:
@@ -109,9 +110,9 @@ def apply_filters_chain(inputFile: str, outputFile: str):
                     im = Image.open(fullname).convert('RGB')                  
                     output_path = pathlib.Path(os.path.abspath(os.path.join(output_folder, outname))).as_posix()
                     im.save(output_path)
-                    print("C\t",fullname,"\t->\t",output_path)
                     line= line.replace(m, output_path)
                     changed=True 
+                    print("CONV\t",fullname,"\t->\t",output_path)
     return line, changed  
 
 
@@ -137,12 +138,12 @@ def generate_documents(infile: str, outfile: str, language: str, template: str, 
   run(f"{base} -i {infile} -o {outfile}.odt")
   filteredTex = os.path.join(outputfolder, infile+'.tex')
   apply_filters_chain(infile+'_original.tex', filteredTex)
-  print("B\t",filteredTex)
+  print("BUILD\t",filteredTex)
   artifacts = [f"{outfile}.epub", f"{outfile}.odt", filteredTex ,infile+'_original.tex' ]
   for a in artifacts:
     if not is_file_in_directory(a, outputFolder):
       d=os.path.join(outputfolder,a)
-      print("M\t",a,"\t->\t",d)
+      print("MOVE\t",a,"\t->\t",d)
       shutil.move(a, d)
 
 
@@ -169,17 +170,18 @@ def generate(title: str, language: str, template: str, fileList: list, outputfol
     ppfile.write("\r\n!TOC\r\n")
         
     for fname in fileList:
-      print("A\t",fname)
+      print("ADD\t",fname)
       ppfile.write(f"\r\n!INCLUDE \"{fname}\", 2\r\n --- \r\n")
     ppfile.write(f"Build {time.ctime()}\r\n")
   
   infile = open(name+".mdPP", "r",encoding="utf8")
   outfile = open(name+".md", "w", encoding="utf8")
-  MarkdownPP(input=infile, modules=['include', 'tableofcontents', 'ImageRelativeToRoot'], output=outfile, encoding="UTF8")
+  c=MarkdownPP.process(input=infile, modules=['include', 'ImageRelativeToRoot'], output=outfile, encoding="UTF8") #'tableofcontents'
   infile.close()
   outfile.close()
   generate_documents(name+".md",name, language, template, outputFolder)
 
+  pprint.pprint(c)
   print(f"Done! You can find the '{language}' book in {outputFolder}")
 
 def check_tools():
@@ -219,7 +221,7 @@ pprint.pprint(args)
 inputFolder=os.path.abspath("./data")
 outputFolder=os.path.abspath("./data/out")
 
-inputFolder = "D:\\Codice\\Frammenti"
+#inputFolder = "D:\\Codice\\Frammenti"
 outputFolder="D:\\Codice\\EbookBuilder\\customoutput"
 
 
@@ -229,7 +231,7 @@ if args.inputFolder:
 if args.outputFolder:
   inputFolder=os.path.abspath(args.inputFolder)
 
-print(inputFolder,"\t->\t", outputFolder)
+print("Generate an ebook from",inputFolder,"put the result in", outputFolder)
 
 os.chdir(inputFolder)
 
