@@ -1,9 +1,8 @@
 # 04 A note inside a folder that is inside another folder
 
+![SIPI Jelly Beans](./SIPI_Jelly_Beans_4.1.07.jpg)
 Handling notes across folders is complicated as the links could either be relative to the current note or to the root folder.
 Markdown is not supposed to handle absolute paths.
-
-![SIPI Jelly Beans](./SIPI_Jelly_Beans_4.1.07.jpg)
 
 ## The first scene of Amlet
 

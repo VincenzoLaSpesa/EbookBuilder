@@ -11,10 +11,11 @@ from PIL import Image
 import argparse
 import pprint
 import sys
+import json
 
+# markdown pp is out of support
 sys.path.append("./markdown-pp")
 from MarkdownPP import MarkdownPP
-
 
 PLANTUML_PATH="D:\\ProgrammiPortable\\bin\\plantuml.jar"
 
@@ -169,7 +170,7 @@ def generate(title: str, language: str, template: str, fileList: list, outputfol
         
     for fname in fileList:
       print("ADD\t",fname)
-      ppfile.write(f"\r\n!INCLUDE \"{fname}\", 2\r\n --- \r\n")
+      ppfile.write(f"\r\n!INCLUDE \"{fname}\", 1\r\n --- \r\n")
     ppfile.write(f"Build {time.ctime()}\r\n")
   
   infile = open(name+".mdPP", "r",encoding="utf8")
@@ -212,6 +213,7 @@ if not check_tools():
 parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--inputFolder",type=str, help="input folder", required=False)
 parser.add_argument("-o", "--outputFolder",type=str, help="output folder", required=False)
+parser.add_argument("-j", "--jsonOption",type=str, help="a json file containing the parameters", required=False)
 
 args = parser.parse_args()
 pprint.pprint(args)
@@ -220,15 +222,30 @@ inputFolder=os.path.abspath("./data")
 outputFolder=os.path.abspath("./data/out")
 blackList=set()
 
-#inputFolder = "D:\\Codice\\Frammenti"
+inputFolder = "D:\\Codice\\Frammenti"
+#inputFolder = "./data/"
 outputFolder="D:\\Codice\\EbookBuilder\\customoutput"
-
+jsonOptions={}
 
 if args.inputFolder:
   inputFolder=os.path.abspath(args.inputFolder)
 
 if args.outputFolder:
-  inputFolder=os.path.abspath(args.inputFolder)
+  outputFolder=os.path.abspath(args.outputFolder)
+
+if args.jsonOption:
+  try:
+    with open(args.jsonOption, 'r') as f:
+      jsonOptions = json.load(f)
+      if "inputFolder" in jsonOptions:
+        inputFolder=os.path.abspath(jsonOptions["inputFolder"])
+      if "outputFolder" in jsonOptions:
+        inputFolder=os.path.abspath(jsonOptions["outputFolder"])
+      if "blackList" in jsonOptions:
+        for b in jsonOptions["blackList"]:
+          blackList.add(b)
+  except Exception as e:
+    print(args.jsonOption, "is not a valid json file", e)
 
 print("Generate an ebook from",inputFolder,"put the result in", outputFolder)
 
@@ -238,8 +255,16 @@ if not os.path.exists(outputFolder):
    os.makedirs(outputFolder)
 
 metadata={}
-with open('metadata.yaml') as file:
+try:
+  with open('metadata.yaml') as file:
     metadata = yaml.safe_load(file)
+except Exception as e:
+  print("metadata.yaml is not a valid json file")
+  if "metadata" in jsonOptions:
+    print("loading metadata from json")
+    metadata=jsonOptions["metadata"]
+  else:
+    print("some metadata are needed for running the generator")
 
 blackList.add(metadata['title']+'.md')
 blackList.add(escape(metadata['title'])+'.md')
